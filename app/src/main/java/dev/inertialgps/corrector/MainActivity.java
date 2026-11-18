@@ -78,17 +78,17 @@ public final class MainActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         scroll.addView(content);
         heading(content, getString(R.string.app_name), 30);
-        text(content, "Compare the GPS fix with a motion-assisted estimate. Sensor drift limits correction to short gaps.");
+        text(content, "A calm dashboard for GPS, motion sensors, and resilient mock publishing.");
         heading(content, "Start location", 20);
         selectedLocation = text(content, "Use the first trusted GPS fix");
         mapButton = button(content, "Select on map", this::showMapPicker);
-        heading(content, "Tracking", 20);
+        heading(content, "LIVE TRACKING", 20);
         status = text(content, "Tracking stopped");
-        heading(content, "Raw GPS", 20);
+        heading(content, "RAW GPS SIGNAL", 20);
         raw = text(content, "—");
-        heading(content, "Corrected estimate", 20);
+        heading(content, "BEST AVAILABLE POSITION", 20);
         corrected = text(content, "—");
-        heading(content, "Mock location", 20);
+        heading(content, "MOCK LOCATION OUTPUT", 20);
         if (state != null) {
             mockMode = PublishMode.fromName(state.getString("mockMode"));
             hasSelectedLocation = state.getBoolean("hasSelectedLocation");
@@ -98,7 +98,7 @@ public final class MainActivity extends Activity {
         mock = button(content, modeLabel(), this::choosePublishMode);
         if (hasSelectedLocation) updateSelectedLocation();
         mockStatus = text(content, "Off");
-        text(content, "Select this app as your mock location app in Developer options. GPS outages only waits 8 seconds without a trusted fix. Anytime publishes whenever an estimate is available. Allow notifications for GPS warnings.");
+        text(content, "Choose Off, GPS outages only, or Anytime. A held position stays visible during sensor pauses; accuracy grows honestly until a trusted fix or fresh motion arrives.");
         button(content, "Open Developer options", () -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
         start = button(content, "Start tracking", this::requestStart);
         stop = button(content, "Stop tracking", () -> {

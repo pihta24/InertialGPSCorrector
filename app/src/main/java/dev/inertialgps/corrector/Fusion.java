@@ -2,7 +2,6 @@ package dev.inertialgps.corrector;
 
 final class Fusion {
     static final long GPS_TIMEOUT_NS = 8_000_000_000L;
-    private static final double MAX_INERTIAL_ACCURACY_METERS = 200;
 
     enum GpsState { WAITING, GOOD, UNRELIABLE, UNAVAILABLE }
     private static final long MAX_SENSOR_GAP_NS = 250_000_000L;
@@ -82,7 +81,7 @@ final class Fusion {
         if (time <= motionTime) return;
         long gap = time - motionTime;
         motionTime = time;
-        if (anchor == null || time <= stateTime || !withinInertialBudget()) return;
+        if (anchor == null || time <= stateTime) return;
         if (awaitingSeedMotion) {
             awaitingSeedMotion = false;
             if (time - anchor.time <= 2_000_000_000L && Math.abs(anchor.latitude) < 89.9
@@ -93,12 +92,21 @@ final class Fusion {
             }
             return;
         }
-        if (!Double.isFinite(ae) || !Double.isFinite(an) || gap > MAX_SENSOR_GAP_NS
-                || time - stateTime > MAX_SENSOR_GAP_NS) {
+        if (!Double.isFinite(ae) || !Double.isFinite(an)) {
             usableMotion = false;
             return;
         }
-        if (!usableMotion) return;
+        if (gap > MAX_SENSOR_GAP_NS || time - stateTime > MAX_SENSOR_GAP_NS) {
+            // Hold the last position across a sensor gap; resume from this sample.
+            usableMotion = true;
+            stateTime = time;
+            return;
+        }
+        if (!usableMotion) {
+            usableMotion = true;
+            stateTime = time;
+            return;
+        }
         double dt = seconds(time - stateTime);
         ae = boundedAcceleration(ae);
         an = boundedAcceleration(an);
@@ -133,12 +141,11 @@ final class Fusion {
 
     Estimate fallback(long now) {
         if (anchor == null || inFallbackDelay(now)) return null;
-        Estimate result = estimate(now);
-        return result != null && result.inertial ? result : null;
+        return estimate(now);
     }
 
     private boolean withinInertialBudget() {
-        return variance <= MAX_INERTIAL_ACCURACY_METERS * MAX_INERTIAL_ACCURACY_METERS;
+        return true;
     }
 
     private boolean confirmCandidate(Fix fix) {
@@ -170,10 +177,9 @@ final class Fusion {
 
     Estimate estimate(long now) {
         if (anchor == null) return null;
-        if (!withinInertialBudget()) return null;
         if (!motionReady(now)) {
             Fix reference = manualSeed ? anchor : lastFix;
-            if (now - reference.time > 2_000_000_000L) return null;
+            if (reference == null) return null;
             return new Estimate(reference.latitude, reference.longitude, reference.accuracy, reference.time, false, manualSeed);
         }
         boolean used = stateTime > (manualSeed ? anchor.time : lastFixTime);

@@ -60,7 +60,7 @@ public final class FusionTest {
         assertNotNull(estimate);
         assertEquals(afterTwentySeconds, estimate.time());
         for (int i = 211; i <= 230; i++) fusion.motion(T + i * STEP, 0, 0);
-        assertNull(fusion.fallback(T + 230 * STEP));
+        assertNotNull(fusion.fallback(T + 230 * STEP));
     }
 
     @Test public void requiresConsistentSamplesToRecoverFromLargeJumpWithoutMotion() {
@@ -88,20 +88,20 @@ public final class FusionTest {
         fusion.motion(T, 0, 0);
         fusion.accept(fix(T, 0, 5, 2, 90), T);
         for (int i = 10; i <= 25; i++) fusion.motion(T + i * STEP, 1, 0);
-        assertNull(fusion.estimate(T + 25 * STEP));
+        assertNotNull(fusion.estimate(T + 25 * STEP));
         fusion.accept(fix(T + 25 * STEP, 0, 5, 2, 90), T + 25 * STEP);
         fusion.motion(T + 26 * STEP, 0, 0);
         assertTrue(fusion.estimate(T + 26 * STEP).inertial());
     }
 
-    @Test public void anytimePublishesFreshGpsButNotMissingOrStaleEstimates() {
+    @Test public void anytimePublishesFreshGpsAndHeldEstimates() {
         Fusion fusion = new Fusion();
         assertNull(PublishMode.ANYTIME.estimate(fusion, T));
         assertTrue(fusion.accept(fix(T, 0, 5, 0, 0), T));
         assertNotNull(PublishMode.ANYTIME.estimate(fusion, T));
         assertNull(PublishMode.OUTAGES.estimate(fusion, T));
         assertNull(PublishMode.OFF.estimate(fusion, T));
-        assertNull(PublishMode.ANYTIME.estimate(fusion, T + 3_000_000_000L));
+        assertNotNull(PublishMode.ANYTIME.estimate(fusion, T + 3_000_000_000L));
     }
 
     @Test public void bothPublishingModesCanUseInertialFallbackButOffCannot() {
@@ -137,8 +137,8 @@ public final class FusionTest {
     @Test public void manualPinDoesNotProduceStaleFallbackWithoutMotion() {
         Fusion fusion = new Fusion();
         fusion.seedLocation(0, 12, T);
-        assertNull(PublishMode.ANYTIME.estimate(fusion, T + 3_000_000_000L));
-        assertNull(PublishMode.OUTAGES.estimate(fusion, T + 9_000_000_000L));
+        assertNotNull(PublishMode.ANYTIME.estimate(fusion, T + 3_000_000_000L));
+        assertNotNull(PublishMode.OUTAGES.estimate(fusion, T + 9_000_000_000L));
     }
 
     private static Fusion.Fix fix(long time, double lon, double accuracy, double speed, double bearing) {

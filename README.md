@@ -63,7 +63,7 @@ flowchart LR
 A trusted GPS fix or a manual map pin anchors the estimate. The app rotates gravity-free acceleration into Earth coordinates, integrates motion, and uses later GPS fixes and velocity to correct drift. It warns about poor accuracy, implausible jumps, and GPS silence. Without working motion sensors it can still show a fresh GPS fix.
 
 > [!IMPORTANT]
-> Motion-based estimates need an initial trusted GPS fix or a manually selected start point. After that there is no fixed outage cutoff: estimates stop when motion data becomes unusable or estimated uncertainty exceeds 200 m. A wrong but plausible GPS fix can go undetected. Keep the phone steady or mounted, and test on a known route before relying on the estimate. **Not for safety-critical navigation.**
+> Motion-based estimates need an initial trusted GPS fix or a manually selected start point. There is no fixed outage or uncertainty cutoff: when sensors pause, the app holds the last estimate and resumes from the next usable sample. Accuracy is reported honestly as it grows. A wrong but plausible GPS fix can go undetected. Keep the phone steady or mounted, and test on a known route before relying on the estimate. **Not for safety-critical navigation.**
 
 ## License
 
