@@ -9,7 +9,9 @@
 
 ## Quick start
 
-Build with **JDK 17+**, **Android SDK 36**, and `adb` on your `PATH`. Connect a phone with USB debugging enabled, or start an emulator.
+Download the signed APK from [GitHub Releases](https://github.com/pihta24/InertialGPSCorrector/releases/latest) and open it on your Android device to install. If you already installed the debug APK, Android will not update it in place because the signatures differ. Uninstalling the debug build removes its local data; select the release build again in Developer options if you use mock publishing.
+
+To build from source, use **JDK 17+**, **Android SDK 36**, and `adb` on your `PATH`. Connect a phone with USB debugging enabled, or start an emulator.
 
 ```sh
 ./gradlew testDebugUnitTest lintDebug assembleDebug
@@ -22,7 +24,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 ## Publishing modes
 
-Publishing is optional and requires the **debug APK**, Google Play services, and Android’s explicit mock-location authorization. Select **Inertial GPS Corrector** under **Developer options → Select mock location app**, then choose a mode under **Mock location → Publish**. You can change the mode while tracking.
+Publishing is optional and requires Google Play services and Android’s explicit mock-location authorization. Select **Inertial GPS Corrector** under **Developer options → Select mock location app**, then choose a mode under **Mock location → Publish**. You can change the mode while tracking.
 
 | Mode | What other apps receive |
 | :--- | :--- |
