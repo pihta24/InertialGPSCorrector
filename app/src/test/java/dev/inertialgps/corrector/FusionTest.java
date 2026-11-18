@@ -115,6 +115,32 @@ public final class FusionTest {
         assertNull(PublishMode.OFF.estimate(fusion, now));
     }
 
+    @Test public void manualPinStartsMotionWithoutCountingAsGps() {
+        Fusion fusion = new Fusion();
+        fusion.seedLocation(0, 12, T);
+        assertTrue(PublishMode.ANYTIME.estimate(fusion, T).manual());
+        assertEquals(Fusion.GpsState.WAITING, fusion.gpsState(T, T));
+        for (int i = 1; i <= 80; i++) fusion.motion(T + i * STEP, 1, 0);
+        assertNull(PublishMode.OUTAGES.estimate(fusion, T + 80 * STEP));
+        long now = T + 81 * STEP;
+        fusion.motion(now, 1, 0);
+        Fusion.Estimate fallback = PublishMode.OUTAGES.estimate(fusion, now);
+        assertTrue(fallback.manual());
+        assertTrue(fallback.inertial());
+        assertTrue(fallback.longitude() > 12);
+        assertEquals(Fusion.GpsState.UNAVAILABLE, fusion.gpsState(now, T));
+        assertTrue(fusion.accept(fix(now, 0, 5, 0, 0), now));
+        assertFalse(fusion.estimate(now).manual());
+        assertEquals(0, fusion.estimate(now).longitude(), 0.000001);
+    }
+
+    @Test public void manualPinDoesNotProduceStaleFallbackWithoutMotion() {
+        Fusion fusion = new Fusion();
+        fusion.seedLocation(0, 12, T);
+        assertNull(PublishMode.ANYTIME.estimate(fusion, T + 3_000_000_000L));
+        assertNull(PublishMode.OUTAGES.estimate(fusion, T + 9_000_000_000L));
+    }
+
     private static Fusion.Fix fix(long time, double lon, double accuracy, double speed, double bearing) {
         return new Fusion.Fix(0, lon, accuracy, time, speed, bearing, 1);
     }

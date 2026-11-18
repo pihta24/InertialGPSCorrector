@@ -36,6 +36,7 @@ public final class TrackingService extends Service implements LocationListener, 
     static final String START = "dev.inertialgps.corrector.START";
     static final String STOP = "dev.inertialgps.corrector.STOP";
     static final String MOCK_MODE = "mockMode";
+    static final String START_LAT = "startLatitude", START_LON = "startLongitude";
     private static final String CHANNEL = "tracking";
     private static final String ALERT_CHANNEL = "gps_warnings";
     private static final int NOTIFICATION = 1;
@@ -92,7 +93,8 @@ public final class TrackingService extends Service implements LocationListener, 
         } else if (START.equals(intent.getAction()) && !running && !stopping) {
             try {
                 startForeground(NOTIFICATION, notification());
-                startTracking(PublishMode.fromName(intent.getStringExtra(MOCK_MODE)));
+                startTracking(PublishMode.fromName(intent.getStringExtra(MOCK_MODE)),
+                        intent.getDoubleExtra(START_LAT, Double.NaN), intent.getDoubleExtra(START_LON, Double.NaN));
             } catch (SecurityException | IllegalArgumentException | IllegalStateException e) {
                 status = "Couldn't start tracking. Check precise location permission and device settings.";
                 endTracking();
@@ -101,7 +103,7 @@ public final class TrackingService extends Service implements LocationListener, 
         return START_NOT_STICKY;
     }
 
-    private void startTracking(PublishMode mode) {
+    private void startTracking(PublishMode mode, double latitude, double longitude) {
         if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
             throw new SecurityException("Precise location is required");
         }
@@ -113,6 +115,11 @@ public final class TrackingService extends Service implements LocationListener, 
         running = true;
         orientationTime = publishedTime = 0;
         declination = 0;
+        if (Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180) {
+            fusion.seedLocation(latitude, longitude, startedAt);
+            declination = Math.toRadians(new GeomagneticField((float) latitude, (float) longitude,
+                    0, System.currentTimeMillis()).getDeclination());
+        }
         mockStatus = "Off";
         Sensor orientation = sensors.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
         Sensor acceleration = sensors.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
@@ -313,8 +320,8 @@ public final class TrackingService extends Service implements LocationListener, 
                     disableMock();
                 } else if (running && mockActive) {
                     if (task.isSuccessful()) {
-                        mockStatus = estimate.inertial() ? "Publishing motion-assisted location"
-                                : "Publishing GPS-based location";
+                        mockStatus = estimate.manual() ? "Publishing manual-start location"
+                                : estimate.inertial() ? "Publishing motion-assisted location" : "Publishing GPS-based location";
                     } else {
                         mockFailed = true;
                         mockStatus = "Publishing failed · check Developer options";

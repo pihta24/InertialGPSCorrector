@@ -22,6 +22,10 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 2. Compare **Raw GPS** with **Corrected estimate**. The app shows the age and approximate accuracy of both. Tracking continues in a foreground service when you leave the screen.
 3. Tap **Stop tracking** in the app or from its notification when you’re done.
 
+## Start from a map pin
+
+Before tapping **Start tracking**, tap **Select on map**, zoom to your current position, tap to place a pin, and choose **Use pin**. Start while stationary: the manual estimate starts with zero velocity, is labeled separately from GPS, and is replaced by the first trusted GPS fix. Choose **Use GPS** in the picker to clear the pin. The map requires internet access and loads tiles from OpenStreetMap; tracking itself does not require map access.
+
 ## Publishing modes
 
 Publishing is optional and requires Google Play services and Android’s explicit mock-location authorization. Select **Inertial GPS Corrector** under **Developer options → Select mock location app**, then choose a mode under **Mock location → Publish**. You can change the mode while tracking.
@@ -29,7 +33,7 @@ Publishing is optional and requires Google Play services and Android’s explici
 | Mode | What other apps receive |
 | :--- | :--- |
 | **Off** | No mock fixes. You can still compare estimates in the app. |
-| **GPS outages only** | Motion-assisted fixes after more than 8 seconds without a trusted GPS fix. Publishing stops when GPS recovers or the estimate expires. |
+| **GPS outages only** | Motion-assisted fixes after more than 8 seconds without a trusted GPS fix (counted from tracking start if using a manual pin). Publishing stops when GPS recovers or the estimate expires. |
 | **Anytime** | The latest usable estimate, including when GPS is working. Publishing pauses when no usable estimate is available. |
 
 Only compatible apps using Google fused location receive these fixes. Android marks them as mock locations, and some apps reject them. Apps that read the raw GPS provider directly are not affected.
@@ -56,10 +60,10 @@ flowchart LR
     Mode -->|If eligible| Mock[Marked mock fix]
 ```
 
-A trusted GPS fix anchors the estimate. The app rotates gravity-free acceleration into Earth coordinates, integrates motion, and uses later GPS fixes and velocity to correct drift. It warns about poor accuracy, implausible jumps, and GPS silence. Without working motion sensors it can still show a fresh GPS fix.
+A trusted GPS fix or a manual map pin anchors the estimate. The app rotates gravity-free acceleration into Earth coordinates, integrates motion, and uses later GPS fixes and velocity to correct drift. It warns about poor accuracy, implausible jumps, and GPS silence. Without working motion sensors it can still show a fresh GPS fix.
 
 > [!IMPORTANT]
-> Motion-based estimates need an initial trusted GPS fix. After that there is no fixed outage cutoff: estimates stop when motion data becomes unusable or estimated uncertainty exceeds 200 m. A wrong but plausible GPS fix can go undetected. Keep the phone steady or mounted, and test on a known route before relying on the estimate. **Not for safety-critical navigation.**
+> Motion-based estimates need an initial trusted GPS fix or a manually selected start point. After that there is no fixed outage cutoff: estimates stop when motion data becomes unusable or estimated uncertainty exceeds 200 m. A wrong but plausible GPS fix can go undetected. Keep the phone steady or mounted, and test on a known route before relying on the estimate. **Not for safety-critical navigation.**
 
 ## License
 

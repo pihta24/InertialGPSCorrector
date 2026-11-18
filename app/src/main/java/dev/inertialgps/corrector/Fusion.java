@@ -10,12 +10,13 @@ final class Fusion {
 
     record Fix(double latitude, double longitude, double accuracy, long time,
                double speed, double bearing, double speedAccuracy) {}
-    record Estimate(double latitude, double longitude, double accuracy, long time, boolean inertial) {}
+    record Estimate(double latitude, double longitude, double accuracy, long time, boolean inertial, boolean manual) {}
 
     private Fix anchor;
     private Fix lastFix;
     private long lastFixTime, lastSampleTime;
     private boolean suspect;
+    private boolean manualSeed, awaitingSeedMotion;
     private Fix candidate;
     private long candidateSince;
     private int candidateCount;
@@ -62,6 +63,7 @@ final class Fusion {
             north += gain * residualN;
             variance = Math.max(9, (1 - gain) * variance);
         }
+        manualSeed = awaitingSeedMotion = false;
         suspect = false;
         candidate = null;
         if (fix.speed >= 0 && fix.speed <= 100 && fix.speedAccuracy >= 0 && fix.speedAccuracy <= 3
@@ -81,6 +83,16 @@ final class Fusion {
         long gap = time - motionTime;
         motionTime = time;
         if (anchor == null || time <= stateTime || !withinInertialBudget()) return;
+        if (awaitingSeedMotion) {
+            awaitingSeedMotion = false;
+            if (time - anchor.time <= 2_000_000_000L && Math.abs(anchor.latitude) < 89.9
+                    && Double.isFinite(ae) && Double.isFinite(an)) {
+                usableMotion = true;
+                stateTime = time;
+                variance += drift(seconds(time - anchor.time));
+            }
+            return;
+        }
         if (!Double.isFinite(ae) || !Double.isFinite(an) || gap > MAX_SENSOR_GAP_NS
                 || time - stateTime > MAX_SENSOR_GAP_NS) {
             usableMotion = false;
@@ -95,13 +107,19 @@ final class Fusion {
         ve = clamp(ve + ae * dt, -100, 100);
         vn = clamp(vn + an * dt, -100, 100);
         // Position uncertainty grows with elapsed time since the last GNSS correction.
-        double age = Math.max(0, seconds(time - lastFixTime));
-        double previousAge = Math.max(0, seconds(stateTime - lastFixTime));
+        long referenceTime = manualSeed ? anchor.time : lastFixTime;
+        double age = Math.max(0, seconds(time - referenceTime));
+        double previousAge = Math.max(0, seconds(stateTime - referenceTime));
         variance += drift(age) - drift(previousAge);
         stateTime = time;
     }
 
     void invalidateMotion() { usableMotion = false; }
+
+    void seedLocation(double latitude, double longitude, long time) {
+        resetPosition(new Fix(latitude, longitude, 25, time, 0, 0, 1));
+        manualSeed = awaitingSeedMotion = true;
+    }
 
     GpsState gpsState(long now, long startedAt) {
         if (now - Math.max(startedAt, lastSampleTime) > GPS_TIMEOUT_NS) return GpsState.UNAVAILABLE;
@@ -110,11 +128,11 @@ final class Fusion {
     }
 
     boolean inFallbackDelay(long now) {
-        return lastFix != null && now - lastFixTime <= GPS_TIMEOUT_NS;
+        return anchor != null && now - (manualSeed ? anchor.time : lastFixTime) <= GPS_TIMEOUT_NS;
     }
 
     Estimate fallback(long now) {
-        if (lastFix == null || inFallbackDelay(now)) return null;
+        if (anchor == null || inFallbackDelay(now)) return null;
         Estimate result = estimate(now);
         return result != null && result.inertial ? result : null;
     }
@@ -154,14 +172,15 @@ final class Fusion {
         if (anchor == null) return null;
         if (!withinInertialBudget()) return null;
         if (!motionReady(now)) {
-            if (now - lastFixTime > 2_000_000_000L) return null;
-            return new Estimate(lastFix.latitude, lastFix.longitude, lastFix.accuracy, lastFixTime, false);
+            Fix reference = manualSeed ? anchor : lastFix;
+            if (now - reference.time > 2_000_000_000L) return null;
+            return new Estimate(reference.latitude, reference.longitude, reference.accuracy, reference.time, false, manualSeed);
         }
-        boolean used = stateTime > lastFixTime;
+        boolean used = stateTime > (manualSeed ? anchor.time : lastFixTime);
         double lat = Math.cos(Math.toRadians(anchor.latitude));
         return new Estimate(clamp(anchor.latitude + Math.toDegrees(north / EARTH_RADIUS), -90, 90),
                 wrap(anchor.longitude + (lat > 1e-6 ? Math.toDegrees(east / (EARTH_RADIUS * lat)) : 0)),
-                Math.sqrt(variance), Math.max(lastFixTime, stateTime), used);
+                Math.sqrt(variance), Math.max(lastFixTime, stateTime), used, manualSeed);
     }
 
     private boolean motionReady(long now) {

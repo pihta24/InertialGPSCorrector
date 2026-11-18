@@ -17,6 +17,16 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.WindowInsets;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
+import android.net.Uri;
+import org.json.JSONArray;
+import org.json.JSONException;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -37,6 +47,12 @@ public final class MainActivity extends Activity {
     private static final String[] MODE_LABELS = {"Off", "GPS outages only", "Anytime"};
     private TrackingService tracking;
     private boolean bound, starting;
+    private double selectedLatitude, selectedLongitude;
+    private boolean hasSelectedLocation;
+    private TextView selectedLocation;
+    private Button mapButton;
+    private AlertDialog mapDialog;
+    private static final String MAP_HOST = "appassets.androidplatform.net";
     private final ServiceConnection connection = new ServiceConnection() {
         @Override public void onServiceConnected(ComponentName name, IBinder service) {
             tracking = ((TrackingService.LocalBinder) service).service();
@@ -63,6 +79,9 @@ public final class MainActivity extends Activity {
         scroll.addView(content);
         heading(content, getString(R.string.app_name), 30);
         text(content, "Compare the GPS fix with a motion-assisted estimate. Sensor drift limits correction to short gaps.");
+        heading(content, "Start location", 20);
+        selectedLocation = text(content, "Use the first trusted GPS fix");
+        mapButton = button(content, "Select on map", this::showMapPicker);
         heading(content, "Tracking", 20);
         status = text(content, "Tracking stopped");
         heading(content, "Raw GPS", 20);
@@ -70,8 +89,14 @@ public final class MainActivity extends Activity {
         heading(content, "Corrected estimate", 20);
         corrected = text(content, "—");
         heading(content, "Mock location", 20);
-        if (state != null) mockMode = PublishMode.fromName(state.getString("mockMode"));
+        if (state != null) {
+            mockMode = PublishMode.fromName(state.getString("mockMode"));
+            hasSelectedLocation = state.getBoolean("hasSelectedLocation");
+            selectedLatitude = state.getDouble("selectedLatitude");
+            selectedLongitude = state.getDouble("selectedLongitude");
+        }
         mock = button(content, modeLabel(), this::choosePublishMode);
+        if (hasSelectedLocation) updateSelectedLocation();
         mockStatus = text(content, "Off");
         text(content, "Select this app as your mock location app in Developer options. GPS outages only waits 8 seconds without a trusted fix. Anytime publishes whenever an estimate is available. Allow notifications for GPS warnings.");
         button(content, "Open Developer options", () -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
@@ -86,6 +111,9 @@ public final class MainActivity extends Activity {
 
     @Override protected void onSaveInstanceState(Bundle out) {
         out.putString("mockMode", mockMode.name());
+        out.putBoolean("hasSelectedLocation", hasSelectedLocation);
+        out.putDouble("selectedLatitude", selectedLatitude);
+        out.putDouble("selectedLongitude", selectedLongitude);
         super.onSaveInstanceState(out);
     }
 
@@ -152,8 +180,11 @@ public final class MainActivity extends Activity {
         try {
             starting = true;
             start.setEnabled(false);
-            startForegroundService(new Intent(this, TrackingService.class).setAction(TrackingService.START)
-                    .putExtra(TrackingService.MOCK_MODE, mockMode.name()));
+            Intent intent = new Intent(this, TrackingService.class).setAction(TrackingService.START)
+                    .putExtra(TrackingService.MOCK_MODE, mockMode.name());
+            if (hasSelectedLocation) intent.putExtra(TrackingService.START_LAT, selectedLatitude)
+                    .putExtra(TrackingService.START_LON, selectedLongitude);
+            startForegroundService(intent);
             ui.postDelayed(() -> starting = false, 1_000);
         } catch (IllegalStateException | SecurityException e) {
             starting = false;
@@ -165,6 +196,7 @@ public final class MainActivity extends Activity {
         TrackingService.Snapshot data = tracking == null ? null : tracking.snapshot();
         boolean busy = data != null && (data.running() || data.stopping());
         start.setEnabled(!busy && !starting);
+        mapButton.setEnabled(!busy && !starting);
         stop.setEnabled(data != null && data.running());
         mock.setEnabled((!starting || (data != null && data.running())) && (data == null || !data.stopping()));
         if (data != null && data.running() && mockMode != data.mockMode()) {
@@ -181,7 +213,8 @@ public final class MainActivity extends Activity {
             Fusion.Estimate estimate = data.corrected();
             corrected.setText(estimate == null ? (data.running() ? "No current estimate" : "—")
                     : format(estimate.latitude(), estimate.longitude(), estimate.accuracy(), estimate.time())
-                            + (estimate.inertial() ? " · GPS + sensors" : " · GPS only"));
+                            + (estimate.manual() ? (estimate.inertial() ? " · Manual start + sensors" : " · Manual start")
+                            : estimate.inertial() ? " · GPS + sensors" : " · GPS only"));
         }
         ui.postDelayed(update, 300);
     }
@@ -190,6 +223,87 @@ public final class MainActivity extends Activity {
         String error = Double.isNaN(accuracy) ? "accuracy unknown" : String.format(Locale.US, "±%.0f m", accuracy);
         return String.format(Locale.US, "%.6f, %.6f\n%s · %.1f s old", lat, lon, error,
                 Math.max(0, SystemClock.elapsedRealtimeNanos() - timestamp) / 1e9);
+    }
+
+    @android.annotation.SuppressLint("SetJavaScriptEnabled") // Only bundled scripts run; no native bridge.
+    private void showMapPicker() {
+        WebView map = new WebView(this);
+        WebSettings settings = map.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
+        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+        settings.setUserAgentString(settings.getUserAgentString() + " InertialGPSCorrector/1.1");
+        map.setWebViewClient(new WebViewClient() {
+            @Override public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return true;
+            }
+
+            @Override public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri url = request.getUrl();
+                String path = url.getPath();
+                if ("https".equals(url.getScheme()) && path != null) {
+                    if ("tile.openstreetmap.org".equals(url.getHost()) && path.matches("/[0-9]+/[0-9]+/[0-9]+\\.png")) return null;
+                    if (MAP_HOST.equals(url.getHost()) && path.matches("/map/([a-zA-Z.-]+|images/[a-zA-Z0-9@.-]+)")) {
+                        String mime = path.endsWith(".js") ? "text/javascript" : path.endsWith(".css") ? "text/css"
+                                : path.endsWith(".png") ? "image/png" : "text/html";
+                        try {
+                            return new WebResourceResponse(mime, mime.equals("image/png") ? null : "UTF-8",
+                                    getAssets().open(path.substring(1)));
+                        } catch (IOException ignored) { }
+                    }
+                }
+                return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream(new byte[0]));
+            }
+
+            @Override public void onPageFinished(WebView view, String url) {
+                if (hasSelectedLocation) view.evaluateJavascript(
+                        "window.centerMap(" + selectedLatitude + "," + selectedLongitude + ")", null);
+            }
+        });
+        LinearLayout panel = new LinearLayout(this);
+        panel.addView(map, new LinearLayout.LayoutParams(-1,
+                Math.min(dp(480), getResources().getDisplayMetrics().heightPixels / 2)));
+        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Choose start location").setView(panel)
+                .setPositiveButton("Use pin", null).setNegativeButton(android.R.string.cancel, null)
+                .setNeutralButton("Use GPS", (d, which) -> {
+                    hasSelectedLocation = false;
+                    updateSelectedLocation();
+                }).create();
+        mapDialog = dialog;
+        dialog.setOnDismissListener(d -> {
+            mapDialog = null;
+            panel.removeView(map);
+            map.destroy();
+        });
+        dialog.show();
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v ->
+                map.evaluateJavascript("window.startPoint || null", result -> {
+                    if (!dialog.isShowing()) return;
+                    try {
+                        JSONArray point = new JSONArray(result == null ? "null" : result);
+                        double lat = point.getDouble(0), lon = point.getDouble(1);
+                        if (!(Math.abs(lat) <= 90 && Math.abs(lon) <= 180)) throw new JSONException("Invalid point");
+                        selectedLatitude = lat;
+                        selectedLongitude = lon;
+                        hasSelectedLocation = true;
+                        updateSelectedLocation();
+                        dialog.dismiss();
+                    } catch (JSONException e) {
+                        Toast.makeText(this, "Tap the map to place a pin first.", Toast.LENGTH_SHORT).show();
+                    }
+                }));
+        map.loadUrl("https://" + MAP_HOST + "/map/picker.html");
+    }
+
+    @Override protected void onDestroy() {
+        if (mapDialog != null) mapDialog.dismiss();
+        super.onDestroy();
+    }
+
+    private void updateSelectedLocation() {
+        selectedLocation.setText(hasSelectedLocation ? String.format(Locale.US,
+                "Manual start: %.6f, %.6f", selectedLatitude, selectedLongitude) : "Use the first trusted GPS fix");
     }
 
     private void openSettings(String action) {

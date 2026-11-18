@@ -1,0 +1,5 @@
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; font: 16px sans-serif; }
+#map { flex: 1; background: #e8eef2; }
+#status { padding: 10px; color: #091628; background: #f4fbff; }
+.leaflet-tile-pane .leaflet-tile { pointer-events: auto; }
