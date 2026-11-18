@@ -17,7 +17,10 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.WindowInsets;
-import android.graphics.Color;
+import android.content.res.ColorStateList;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.widget.ImageView;
 import android.graphics.drawable.GradientDrawable;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
@@ -38,6 +41,11 @@ import android.widget.Toast;
 import java.util.Locale;
 
 public final class MainActivity extends Activity {
+    private static final int NAVY = 0xff091628;
+    private static final int PANEL = 0xff132743;
+    private static final int MINT = 0xff57e4c6;
+    private static final int PERIWINKLE = 0xffb5c8ff;
+    private static final int PALE = 0xffe1fff8;
     private static final int LOCATION_PERMISSION = 10;
     private static final int NOTIFICATION_PERMISSION = 11;
     private final Handler ui = new Handler(Looper.getMainLooper());
@@ -65,11 +73,11 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.rgb(9, 22, 40));
-        getWindow().setNavigationBarColor(Color.rgb(9, 22, 40));
+        getWindow().setStatusBarColor(NAVY);
+        getWindow().setNavigationBarColor(NAVY);
         ScrollView scroll = new ScrollView(this);
         scroll.setClipToPadding(false);
-        scroll.setBackgroundColor(Color.rgb(9, 22, 40));
+        scroll.setBackgroundColor(NAVY);
         int pad = dp(20);
         scroll.setPadding(pad, pad, pad, pad);
         scroll.setOnApplyWindowInsetsListener((view, insets) -> {
@@ -83,35 +91,46 @@ public final class MainActivity extends Activity {
         content.setOrientation(LinearLayout.VERTICAL);
         content.setPadding(dp(4), dp(8), dp(4), dp(16));
         scroll.addView(content);
-        heading(content, getString(R.string.app_name), 30);
-        text(content, "A calm dashboard for GPS, motion sensors, and resilient mock publishing.");
-        heading(content, "Start location", 20);
-        selectedLocation = text(content, "Use the first trusted GPS fix");
-        mapButton = button(content, "Select on map", this::showMapPicker);
-        heading(content, "LIVE TRACKING", 20);
-        status = text(content, "Tracking stopped");
-        heading(content, "RAW GPS SIGNAL", 20);
-        raw = text(content, "—");
-        heading(content, "BEST AVAILABLE POSITION", 20);
-        corrected = text(content, "—");
-        heading(content, "MOCK LOCATION OUTPUT", 20);
+        LinearLayout hero = card(content);
+        ImageView mark = new ImageView(this);
+        mark.setImageResource(R.mipmap.ic_launcher);
+        mark.setImportantForAccessibility(ImageView.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        hero.addView(mark, new LinearLayout.LayoutParams(dp(54), dp(54)));
+        heading(hero, getString(R.string.app_name), 28);
+        text(hero, "GPS and motion tracking");
+        status = text(hero, "Tracking stopped");
+        status.setTextColor(MINT);
+        start = button(hero, "Start tracking", this::requestStart, true);
+        stop = button(hero, "Stop tracking", () -> {
+            stop.setEnabled(false);
+            startService(new Intent(this, TrackingService.class).setAction(TrackingService.STOP));
+        });
+        stop.setEnabled(false);
+
+        LinearLayout position = card(content);
+        heading(position, "Best available position", 20);
+        corrected = text(position, "—");
+        heading(position, "Raw GPS signal", 17);
+        raw = text(position, "—");
+
+        LinearLayout origin = card(content);
+        heading(origin, "Start location", 20);
+        selectedLocation = text(origin, "Use the first trusted GPS fix");
+        mapButton = button(origin, "Select on map", this::showMapPicker);
+
+        LinearLayout output = card(content);
+        heading(output, "Mock location output", 20);
         if (state != null) {
             mockMode = PublishMode.fromName(state.getString("mockMode"));
             hasSelectedLocation = state.getBoolean("hasSelectedLocation");
             selectedLatitude = state.getDouble("selectedLatitude");
             selectedLongitude = state.getDouble("selectedLongitude");
         }
-        mock = button(content, modeLabel(), this::choosePublishMode);
+        mock = button(output, modeLabel(), this::choosePublishMode);
         if (hasSelectedLocation) updateSelectedLocation();
-        mockStatus = text(content, "Off");
-        text(content, "Choose Off, GPS outages only, or Anytime. A held position stays visible during sensor pauses; accuracy grows honestly until a trusted fix or fresh motion arrives.");
-        button(content, "Open Developer options", () -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
-        start = button(content, "Start tracking", this::requestStart);
-        stop = button(content, "Stop tracking", () -> {
-            stop.setEnabled(false);
-            startService(new Intent(this, TrackingService.class).setAction(TrackingService.STOP));
-        });
-        stop.setEnabled(false);
+        mockStatus = text(output, "Off");
+        text(output, "Outages only waits 8 seconds without a trusted GPS fix. To publish, select this app as your mock location app in Developer options.");
+        button(output, "Open Developer options", () -> openSettings(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS));
         setContentView(scroll);
     }
 
@@ -320,7 +339,7 @@ public final class MainActivity extends Activity {
     private TextView text(LinearLayout parent, String value) {
         TextView view = new TextView(this);
         view.setTextSize(16);
-        view.setTextColor(Color.rgb(181, 200, 255));
+        view.setTextColor(PERIWINKLE);
         view.setText(value);
         view.setPadding(dp(4), dp(6), dp(4), dp(12));
         parent.addView(view);
@@ -330,25 +349,51 @@ public final class MainActivity extends Activity {
     private void heading(LinearLayout parent, String value, int size) {
         TextView view = text(parent, value);
         view.setTextSize(size);
-        view.setTextColor(Color.rgb(225, 255, 248));
+        view.setTextColor(PALE);
         view.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         if (Build.VERSION.SDK_INT >= 28) view.setAccessibilityHeading(true);
     }
 
+    private LinearLayout card(LinearLayout parent) {
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(shape(PANEL, 0xff304765, 24));
+        card.setPadding(dp(16), dp(16), dp(16), dp(12));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(12);
+        parent.addView(card, params);
+        return card;
+    }
+
+    private GradientDrawable shape(int fill, int stroke, int radius) {
+        GradientDrawable shape = new GradientDrawable();
+        shape.setColor(fill);
+        shape.setStroke(dp(1), stroke);
+        shape.setCornerRadius(dp(radius));
+        return shape;
+    }
+
     private Button button(LinearLayout parent, String label, Runnable action) {
+        return button(parent, label, action, false);
+    }
+
+    private Button button(LinearLayout parent, String label, Runnable action, boolean primary) {
         Button button = new Button(this);
         button.setText(label);
-        button.setTextColor(Color.rgb(9, 22, 40));
+        int[] disabled = {-android.R.attr.state_enabled};
+        button.setTextColor(new ColorStateList(new int[][]{disabled, {}},
+                new int[]{0xff9aaac5, primary ? NAVY : PALE}));
         button.setAllCaps(false);
         button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.rgb(87, 228, 198));
-        background.setCornerRadius(dp(18));
-        button.setBackground(background);
+        StateListDrawable states = new StateListDrawable();
+        states.addState(disabled, shape(PANEL, 0xff304765, 18));
+        states.addState(new int[0], shape(primary ? MINT : NAVY, primary ? MINT : 0xff526c93, 18));
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(primary ? 0x33091628 : 0x33b5c8ff), states, null));
+        button.setMinHeight(dp(48));
+        button.setPadding(dp(12), dp(8), dp(12), dp(8));
         button.setOnClickListener(view -> action.run());
-        int match = LinearLayout.LayoutParams.MATCH_PARENT, wrap = LinearLayout.LayoutParams.WRAP_CONTENT;
-        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match, wrap);
-        params.setMargins(0, 0, 0, dp(10));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.bottomMargin = dp(8);
         parent.addView(button, params);
         return button;
     }

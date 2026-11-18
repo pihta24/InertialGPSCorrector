@@ -19,7 +19,7 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
 1. Enable device location, open the app, and tap **Start tracking**. Grant **Precise location** and allow notifications for background GPS warnings. Go outdoors for the first fix.
-2. Compare **Raw GPS** with **Corrected estimate**. The app shows the age and approximate accuracy of both. Tracking continues in a foreground service when you leave the screen.
+2. Compare **Raw GPS signal** with **Best available position**. The app shows the age and approximate accuracy of both. Tracking continues in a foreground service when you leave the screen.
 3. Tap **Stop tracking** in the app or from its notification when you’re done.
 
 ## Start from a map pin
@@ -28,7 +28,7 @@ Before tapping **Start tracking**, tap **Select on map**, zoom to your current p
 
 ## Publishing modes
 
-Publishing is optional and requires Google Play services and Android’s explicit mock-location authorization. Select **Inertial GPS Corrector** under **Developer options → Select mock location app**, then choose a mode under **Mock location → Publish**. You can change the mode while tracking.
+Publishing is optional and requires Google Play services and Android’s explicit mock-location authorization. Select **Inertial GPS Corrector** under **Developer options → Select mock location app**, then choose a mode under **Mock location output → Publish**. You can change the mode while tracking.
 
 | Mode | What other apps receive |
 | :--- | :--- |
