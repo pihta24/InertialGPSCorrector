@@ -17,6 +17,8 @@ import android.os.Looper;
 import android.os.SystemClock;
 import android.provider.Settings;
 import android.view.WindowInsets;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -63,9 +65,12 @@ public final class MainActivity extends Activity {
 
     @Override public void onCreate(Bundle state) {
         super.onCreate(state);
+        getWindow().setStatusBarColor(Color.rgb(9, 22, 40));
+        getWindow().setNavigationBarColor(Color.rgb(9, 22, 40));
         ScrollView scroll = new ScrollView(this);
         scroll.setClipToPadding(false);
-        int pad = dp(24);
+        scroll.setBackgroundColor(Color.rgb(9, 22, 40));
+        int pad = dp(20);
         scroll.setPadding(pad, pad, pad, pad);
         scroll.setOnApplyWindowInsetsListener((view, insets) -> {
             if (Build.VERSION.SDK_INT >= 30) {
@@ -76,6 +81,7 @@ public final class MainActivity extends Activity {
         });
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
+        content.setPadding(dp(4), dp(8), dp(4), dp(16));
         scroll.addView(content);
         heading(content, getString(R.string.app_name), 30);
         text(content, "A calm dashboard for GPS, motion sensors, and resilient mock publishing.");
@@ -314,8 +320,9 @@ public final class MainActivity extends Activity {
     private TextView text(LinearLayout parent, String value) {
         TextView view = new TextView(this);
         view.setTextSize(16);
+        view.setTextColor(Color.rgb(181, 200, 255));
         view.setText(value);
-        view.setPadding(0, dp(4), 0, dp(10));
+        view.setPadding(dp(4), dp(6), dp(4), dp(12));
         parent.addView(view);
         return view;
     }
@@ -323,6 +330,7 @@ public final class MainActivity extends Activity {
     private void heading(LinearLayout parent, String value, int size) {
         TextView view = text(parent, value);
         view.setTextSize(size);
+        view.setTextColor(Color.rgb(225, 255, 248));
         view.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         if (Build.VERSION.SDK_INT >= 28) view.setAccessibilityHeading(true);
     }
@@ -330,9 +338,18 @@ public final class MainActivity extends Activity {
     private Button button(LinearLayout parent, String label, Runnable action) {
         Button button = new Button(this);
         button.setText(label);
+        button.setTextColor(Color.rgb(9, 22, 40));
+        button.setAllCaps(false);
+        button.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.rgb(87, 228, 198));
+        background.setCornerRadius(dp(18));
+        button.setBackground(background);
         button.setOnClickListener(view -> action.run());
         int match = LinearLayout.LayoutParams.MATCH_PARENT, wrap = LinearLayout.LayoutParams.WRAP_CONTENT;
-        parent.addView(button, new LinearLayout.LayoutParams(match, wrap));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(match, wrap);
+        params.setMargins(0, 0, 0, dp(10));
+        parent.addView(button, params);
         return button;
     }
 
