@@ -54,8 +54,13 @@ public final class FusionTest {
         fusion.motion(T + 81 * STEP, 0, 0);
         assertEquals(Fusion.GpsState.UNAVAILABLE, fusion.gpsState(T + 81 * STEP, T));
         assertNotNull(fusion.fallback(T + 81 * STEP));
-        for (int i = 82; i <= 300; i++) fusion.motion(T + i * STEP, 0, 0);
-        assertNull(fusion.fallback(T + 300 * STEP));
+        for (int i = 82; i <= 210; i++) fusion.motion(T + i * STEP, 0, 0);
+        long afterTwentySeconds = T + 210 * STEP;
+        Fusion.Estimate estimate = fusion.fallback(afterTwentySeconds);
+        assertNotNull(estimate);
+        assertEquals(afterTwentySeconds, estimate.time());
+        for (int i = 211; i <= 230; i++) fusion.motion(T + i * STEP, 0, 0);
+        assertNull(fusion.fallback(T + 230 * STEP));
     }
 
     @Test public void requiresConsistentSamplesToRecoverFromLargeJumpWithoutMotion() {

@@ -2,7 +2,6 @@ package dev.inertialgps.corrector;
 
 final class Fusion {
     static final long GPS_TIMEOUT_NS = 8_000_000_000L;
-    static final long MAX_INERTIAL_AGE_NS = 20_000_000_000L;
     private static final double MAX_INERTIAL_ACCURACY_METERS = 200;
 
     enum GpsState { WAITING, GOOD, UNRELIABLE, UNAVAILABLE }
@@ -36,7 +35,7 @@ final class Fusion {
             candidate = null;
             return false;
         }
-        boolean canFuse = lastFix != null && withinInertialBudget(now) && motionReady(now);
+        boolean canFuse = lastFix != null && withinInertialBudget() && motionReady(now);
         double age = seconds(stateTime - fix.time);
         double error = Math.max(3, fix.accuracy) + Math.abs(age) * (2 + Math.hypot(ve, vn) * 0.2);
         double residualE = 0, residualN = 0;
@@ -49,7 +48,7 @@ final class Fusion {
             residualN = measuredNorth - (north - age * vn);
             jump |= Math.hypot(residualE, residualN) > Math.max(25, 3 * Math.sqrt(variance + error * error));
         }
-        if (jump || (candidate != null && !withinInertialBudget(now))) {
+        if (jump || (candidate != null && !withinInertialBudget())) {
             suspect = true;
             boolean confirmed = confirmCandidate(fix);
             // Don't re-anchor to a conflicting track while a recent inertial estimate still exists.
@@ -81,7 +80,7 @@ final class Fusion {
         if (time <= motionTime) return;
         long gap = time - motionTime;
         motionTime = time;
-        if (anchor == null || time <= stateTime || time - lastFixTime > MAX_INERTIAL_AGE_NS) return;
+        if (anchor == null || time <= stateTime || !withinInertialBudget()) return;
         if (!Double.isFinite(ae) || !Double.isFinite(an) || gap > MAX_SENSOR_GAP_NS
                 || time - stateTime > MAX_SENSOR_GAP_NS) {
             usableMotion = false;
@@ -120,9 +119,8 @@ final class Fusion {
         return result != null && result.inertial ? result : null;
     }
 
-    private boolean withinInertialBudget(long now) {
-        return now - lastFixTime <= MAX_INERTIAL_AGE_NS
-                && variance <= MAX_INERTIAL_ACCURACY_METERS * MAX_INERTIAL_ACCURACY_METERS;
+    private boolean withinInertialBudget() {
+        return variance <= MAX_INERTIAL_ACCURACY_METERS * MAX_INERTIAL_ACCURACY_METERS;
     }
 
     private boolean confirmCandidate(Fix fix) {
@@ -154,7 +152,7 @@ final class Fusion {
 
     Estimate estimate(long now) {
         if (anchor == null) return null;
-        if (!withinInertialBudget(now)) return null;
+        if (!withinInertialBudget()) return null;
         if (!motionReady(now)) {
             if (now - lastFixTime > 2_000_000_000L) return null;
             return new Estimate(lastFix.latitude, lastFix.longitude, lastFix.accuracy, lastFixTime, false);
