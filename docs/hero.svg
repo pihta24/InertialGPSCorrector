@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 280" width="960" height="280" role="img" aria-labelledby="title desc">
+  <title id="title">Inertial GPS Corrector</title>
+  <desc id="desc">A smooth motion-assisted route bridges a gap between scattered GPS fixes.</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#091628"/><stop offset="1" stop-color="#12414b"/>
+    </linearGradient>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#89c8db" opacity=".13"/>
+    </pattern>
+  </defs>
+  <rect width="960" height="280" rx="24" fill="url(#background)"/>
+  <rect width="960" height="280" rx="24" fill="url(#grid)"/>
+  <g font-family="system-ui, sans-serif">
+    <text x="52" y="78" fill="#8fe9d7" font-size="16" font-weight="700" letter-spacing="3">ANDROID • SENSOR FUSION</text>
+    <text x="48" y="142" fill="#f4fbff" font-size="49" font-weight="750">Inertial GPS</text>
+    <text x="48" y="197" fill="#f4fbff" font-size="49" font-weight="750">Corrector</text>
+    <text x="52" y="239" fill="#b7d7e0" font-size="18">Bridge short GPS gaps with phone motion sensors.</text>
+  </g>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M542 209L600 167L635 176M771 97L802 117L853 61L910 81" stroke="#b5c8ff" stroke-width="2" stroke-dasharray="3 8"/>
+    <path d="M542 198C584 190 596 164 633 166S705 151 731 124S776 112 801 105S863 67 910 76" stroke="#57e4c6" stroke-width="5"/>
+  </g>
+  <g fill="#b5c8ff"><circle cx="542" cy="209" r="5"/><circle cx="600" cy="167" r="5"/><circle cx="635" cy="176" r="5"/><circle cx="771" cy="97" r="5"/><circle cx="802" cy="117" r="5"/><circle cx="853" cy="61" r="5"/><circle cx="910" cy="81" r="5"/></g>
+  <circle cx="730" cy="125" r="16" fill="#57e4c6" opacity=".25"/><circle cx="730" cy="125" r="6" fill="#e1fff8"/>
+</svg>
